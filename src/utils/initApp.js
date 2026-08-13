@@ -251,15 +251,17 @@ async function runDeferredAppInit() {
     const settings = await initSettings({ hydrateLocalMusic: true })
     const mediaSessionReadyPromise = ensureMediaSessionReady()
 
-    try {
-        await initializeCurrentAccountSession()
-    } catch (error) {
-        console.error('用户信息加载失败:', error)
-    } finally {
-        restoreLastSongOnce()
+    if (!userStore.localOnlyMode) {
+        try {
+            await initializeCurrentAccountSession()
+        } catch (error) {
+            console.error('用户信息加载失败:', error)
+        }
     }
 
-    scheduleSirenDurationPreload()
+    restoreLastSongOnce()
+
+    if (!userStore.localOnlyMode) scheduleSirenDurationPreload()
     await mediaSessionReadyPromise
     return settings
 }

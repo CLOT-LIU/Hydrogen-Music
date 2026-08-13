@@ -16,6 +16,7 @@
   import { getIndexedSong } from '../utils/songList'
   import { getSongCoverUrl, withCoverParam } from '../utils/coverBackdrop'
   import { useStableImageSource } from '../composables/useStableImageSource'
+  import defaultLocalCover from '../assets/icon/icon.png'
   const PlayList = defineAsyncComponent(() => import('./PlayList.vue'))
   const router = useRouter()
   const userStore = useUserStore()
@@ -186,7 +187,7 @@
         <div class="music-img" @click="showPlayer()">
             <img v-if="currentSong && !isCurrentLocalSong && displayedCurrentSongCoverUrl" :src="displayedCurrentSongCoverUrl" alt="">
             <img v-else-if="currentSong && isCurrentLocalSong && localBase64Img" :src="localBase64Img" alt="">
-            <img v-else-if="currentSong && isCurrentLocalSong" src="https://p3.music.126.net/UeTuwE7pvjBpypWLudqukA==/3132508627578625.jpg?param=128y128" alt="">
+            <img v-else-if="currentSong && isCurrentLocalSong" :src="defaultLocalCover" alt="">
             <div class="open-player">
                 <svg t="1670207990373" class="open-player-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5640" width="200" height="200"><path d="M960.1 699.7l-72.8 72.8L512 397.1 136.7 772.5l-72.8-72.8L512 251.5z" fill="#ffffff" p-id="5641"></path></svg>
             </div>

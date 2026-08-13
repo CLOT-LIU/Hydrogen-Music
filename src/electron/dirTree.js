@@ -160,6 +160,9 @@ async function createMusicFileNode(filePath, fileName, progressReporter, parseWi
         dirPath: filePath,
     }
 
+    const fileStat = await parseWithLimit(() => fsp.stat(filePath))
+    baseNode.modifiedTime = fileStat.mtimeMs
+
     try {
         const metadata = await parseWithLimit(() => parseFile(filePath))
         await enrichMetadataFromSidecars(filePath, metadata)

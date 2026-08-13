@@ -16,6 +16,7 @@ import { getSongCoverUrl, withCoverParam } from '../utils/coverBackdrop';
 import { getSongDisplayName } from '../utils/songName';
 import { getIndexedSong } from '../utils/songList';
 import { useStableImageSource } from '../composables/useStableImageSource';
+import defaultLocalCover from '../assets/icon/icon.png';
 const PlayList = defineAsyncComponent(() => import('./PlayList.vue'));
 
 // 定义 props 和 emit
@@ -298,7 +299,7 @@ const toggleDjSub = async isSubscribe => {
                     <img
                         v-else-if="currentSong?.type === 'local'"
                         :key="'local-default-' + (songId || currentSong?.id)"
-                        src="https://p3.music.126.net/UeTuwE7pvjBpypWLudqukA==/3132508627578625.jpg?param=140y140"
+                        :src="defaultLocalCover"
                         alt=""
                     />
                 </div>

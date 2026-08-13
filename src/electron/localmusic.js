@@ -1,6 +1,7 @@
 const { ipcMain } = require('electron')
 const scanLocalMusicTree = require('./dirTree')
 const Store = require('electron-store').default
+const LOCAL_CACHE_VERSION = 2
 
 const moduleState = {
     initialized: false,
@@ -39,6 +40,7 @@ module.exports = function LocalFiles(win) {
 
     function buildLocalPayload({ dirTree, metadata, type, count = 0, derived = null }) {
         return {
+            cacheVersion: LOCAL_CACHE_VERSION,
             dirTree,
             locaFilesMetadata: metadata,
             localFilesMetadata: metadata,
@@ -62,7 +64,7 @@ module.exports = function LocalFiles(win) {
         const cacheKey = getCacheKey(type)
         const cachedPayload = !refresh ? await localStore.get(cacheKey) : null
 
-        if (cachedPayload) {
+        if (cachedPayload?.cacheVersion === LOCAL_CACHE_VERSION) {
             sendToRenderer('local-music-files', {
                 ...cachedPayload,
                 localFilesMetadata: cachedPayload.localFilesMetadata || cachedPayload.locaFilesMetadata,

@@ -43,6 +43,7 @@ const { updateLibraryDetail } = libraryStore
 const { libraryInfo } = storeToRefs(libraryStore)
 const localStore = useLocalStore()
 const otherStore = useOtherStore()
+const localOnlyRouteNames = new Set(['settings', 'mymusic', 'localFiles', 'localAlbum', 'localArtist'])
 const hasDifferentLibraryId = (to, from) => String(to?.params?.id || '') != String(from?.params?.id || '')
 const routeComponentPreloadLoaders = [
     HomePage,
@@ -77,7 +78,7 @@ async function preloadRouteComponentBatch(startIndex = 0) {
 }
 
 function scheduleRouteComponentPreload() {
-    if (routeComponentPreloadStarted || typeof window === 'undefined') return
+    if (routeComponentPreloadStarted || typeof window === 'undefined' || userStore.localOnlyMode) return
     routeComponentPreloadStarted = true
     void preloadRouteComponentBatch()
 }
@@ -208,7 +209,7 @@ const routes = [
             },
         ],
         beforeEnter: (to, from, next) => {
-            if(isLogin()) next()
+            if(userStore.localOnlyMode || isLogin()) next()
             else if((from.name == 'homepage' || from.name == 'search') && to.fullPath != '/mymusic') next()
             else next({name: 'login'})
         },
@@ -261,6 +262,11 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
+    if (userStore.localOnlyMode && !localOnlyRouteNames.has(String(to.name || ''))) {
+        next({ name: 'mymusic' })
+        return
+    }
+
     const fullPath = typeof to?.fullPath === 'string' ? to.fullPath : ''
     const shouldWarmDeferredInit = fullPath.startsWith('/mymusic')
         || fullPath.startsWith('/cloud')

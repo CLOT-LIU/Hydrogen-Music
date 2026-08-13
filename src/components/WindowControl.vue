@@ -5,15 +5,12 @@ defineOptions({
     inheritAttrs: false,
 });
 
-const isMacOS = ref(false);
+const isMacOS = ref(window.process.platform === 'darwin');
 const isWindowMaximized = ref(false);
 let removeWindowMaximizedListener = null;
 const attrs = useAttrs();
 
 onMounted(() => {
-    // 检测是否为 macOS
-    isMacOS.value = navigator.platform.toLowerCase().includes('mac');
-
     if (typeof windowApi.getWindowMaximizedState === 'function') {
         windowApi.getWindowMaximizedState()
             .then((state) => {

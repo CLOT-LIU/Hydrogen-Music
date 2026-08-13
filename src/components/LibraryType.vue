@@ -133,6 +133,14 @@
     const requestUserId = getCurrentUserId()
     const requestToken = ++libraryRequestToken
 
+    if (userStore.localOnlyMode) {
+      option.value = 3
+      typeTracker.value = 3
+      listType1.value = 3
+      listType2.value = typeFour.value
+      return true
+    }
+
     if ((option.value == 0 || option.value == 1) && !requestUserId) {
       clearAccountLibraryLists()
       return false
@@ -232,6 +240,13 @@
   }
 
   watch(
+    () => userStore.localOnlyMode,
+    enabled => {
+      changeTracker(enabled ? 3 : 0)
+    }
+  )
+
+  watch(
     () => user.value?.userId ?? null,
     (nextUserId, previousUserId) => {
       if (nextUserId === previousUserId) return
@@ -260,7 +275,7 @@
     }
   })
 
-  changeTracker(0)
+  changeTracker(userStore.localOnlyMode ? 3 : 0)
 </script>
 
 <template>
@@ -268,14 +283,14 @@
     <div class="library-type">
         <div class="type-one">
             <div class="type-option">
-            <span class="option" :class="{'option-selected': option == 0}" @click="changeTracker(0)" id="myPlaylist">歌单</span>
-            <span class="option" :class="{'option-selected': option == 1}" @click="changeTracker(1)">收藏</span>
-            <span class="option" :class="{'option-selected': option == 2}" @click="changeTracker(2)">下载管理</span>
+            <span v-if="!userStore.localOnlyMode" class="option" :class="{'option-selected': option == 0}" @click="changeTracker(0)" id="myPlaylist">歌单</span>
+            <span v-if="!userStore.localOnlyMode" class="option" :class="{'option-selected': option == 1}" @click="changeTracker(1)">收藏</span>
+            <span v-if="!userStore.localOnlyMode" class="option" :class="{'option-selected': option == 2}" @click="changeTracker(2)">下载管理</span>
             <span class="option" :class="{'option-selected': option == 3}" @click="changeTracker(3)">本地管理</span>
             </div>
             <div class="option-tracker">
             <div class="tracker-line"></div>
-            <div :class="{'tracker': true, 'tracker0': typeTracker == 0, 'tracker1': typeTracker == 1, 'tracker2': typeTracker == 2, 'tracker3': typeTracker == 3}"></div>
+            <div :class="{'tracker': true, 'tracker0': typeTracker == 0, 'tracker1': typeTracker == 1, 'tracker2': typeTracker == 2, 'tracker3': typeTracker == 3, 'tracker-local-only': userStore.localOnlyMode}"></div>
             </div>
         </div>
         <div class="type-two">
@@ -355,6 +370,9 @@
             .tracker3{
                 width: 64Px;
                 left: 193Px;
+            }
+            .tracker-local-only{
+                left: 4Px;
             }
         }
     }

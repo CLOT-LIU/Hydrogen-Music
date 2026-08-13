@@ -4,7 +4,9 @@
   import { songTime2 } from '../utils/time';
   import { addLocalMusicTOList, setShuffledList } from '../utils/player/lazy'
   import { matchSearchText, normalizeSongFilterKeyword } from '../utils/songFilter';
+  import { createSongSortOptions, sortSongEntries } from '../utils/songSort';
   import SongFilterInput from './SongFilterInput.vue';
+  import SongSortControl from './SongSortControl.vue';
   import { useLocalStore } from '../store/localStore';
   import { usePlayerStore } from '../store/playerStore';
   import { useOtherStore } from '../store/otherStore';
@@ -17,6 +19,8 @@
   const { songId, playMode, playing } =storeToRefs(playerStore)
   const otherStore = useOtherStore()
   const localSearchKeyword = ref('')
+  const localSortMode = ref('default')
+  const localSortOptions = createSongSortOptions('修改时间')
   const currentLocalScope = computed(() => {
     if (currentType.value == 'localAlbum' || currentType.value == 'localArtist') return 'local'
     return currentSelectedInfo.value?.scope || 'local'
@@ -39,22 +43,33 @@
       if(operation) router.forward()
       else router.back()
   }
-  const filteredSongEntries = computed(() => {
+  const sortedSongEntries = computed(() => {
     const songs = Array.isArray(currentSelectedSongs.value) ? currentSelectedSongs.value : []
-    const keyword = normalizeSongFilterKeyword(localSearchKeyword.value)
-
-    return songs
+    const entries = songs
       .map((item, sourceIndex) => ({
         song: item,
         sourceIndex,
         rowKey: String(item?.id ?? `local-${sourceIndex}`),
       }))
+
+    return sortSongEntries(entries, localSortMode.value, {
+      getTitle: entry => entry.song?.common?.title || entry.song?.common?.localTitle,
+      getArtist: entry => entry.song?.common?.artists?.join('/'),
+      getTime: entry => entry.song?.modifiedTime,
+    }).map((entry, queueIndex) => ({ ...entry, queueIndex }))
+  })
+  const hasChangedLocalSort = computed(() => localSortMode.value != 'default'
+    && sortedSongEntries.value.some((entry, index) => entry.sourceIndex != index))
+  const filteredSongEntries = computed(() => {
+    const keyword = normalizeSongFilterKeyword(localSearchKeyword.value)
+    return sortedSongEntries.value
       .filter(entry => !keyword || matchSearchText(localStore.getSongSearchText(entry.song, currentLocalScope.value), keyword))
   })
   const hasLocalSearchKeyword = computed(() => normalizeSongFilterKeyword(localSearchKeyword.value) !== '')
   const showLocalSearchEmpty = computed(() => hasLocalSearchKeyword.value && filteredSongEntries.value.length == 0)
-  const play = async (item, sourceIndex) => {
-    await addLocalMusicTOList(router.currentRoute.value.name, currentSelectedSongs.value || [], item.id, sourceIndex)
+  const play = async (item, queueIndex) => {
+    const sortedSongs = sortedSongEntries.value.map(entry => entry.song)
+    await addLocalMusicTOList(router.currentRoute.value.name, sortedSongs, item.id, queueIndex)
     if(playMode.value == 3) await setShuffledList()
   }
   const openMenu = (e, item) => {
@@ -83,7 +98,7 @@
   }
 
   watch(
-    () => localSearchKeyword.value,
+    () => [localSearchKeyword.value, localSortMode.value],
     () => {
       void resetLocalResultScroll()
     }
@@ -106,15 +121,19 @@
         <span class="local-music-title">{{ currentSelectedInfo.name }}</span>
       </div>
       <div class="local-music-body">
-        <div class="local-search-bar">
-          <SongFilterInput v-model="localSearchKeyword" compact show-icon placeholder="SEARCH"></SongFilterInput>
+        <div class="local-list-tools">
+          <SongFilterInput v-model="localSearchKeyword" compact show-icon placeholder="SEARCH">
+            <template #trailing>
+              <SongSortControl v-model="localSortMode" :options="localSortOptions" :changed="hasChangedLocalSort"></SongSortControl>
+            </template>
+          </SongFilterInput>
         </div>
         <div id="local-list" class="local-music-list">
           <div class="local-search-empty" v-if="showLocalSearchEmpty">
             <span class="empty-title">未找到相关歌曲</span>
           </div>
           <template v-else>
-            <div class="list-item" :key="entry.rowKey" :class="{'list-item-playing': songId == entry.song.id}" @dblclick="play(entry.song, entry.sourceIndex)" @contextmenu="openMenu($event,entry.song)" v-for="entry in filteredSongEntries">
+            <div class="list-item" :key="entry.rowKey" :class="{'list-item-playing': songId == entry.song.id}" @dblclick="play(entry.song, entry.queueIndex)" @contextmenu="openMenu($event,entry.song)" v-for="entry in filteredSongEntries">
               <div class="item-title">
                 <div class="item-state">
                     <div class="playing-eq" v-show="(songId == entry.song.id)" :class="{ 'is-paused': !playing }" aria-hidden="true">
@@ -123,7 +142,7 @@
                       <span class="bar"></span>
                       <span class="bar"></span>
                     </div>
-                    <div class="item-num" v-show="!(songId == entry.song.id)">{{entry.sourceIndex + 1}}</div>
+                    <div class="item-num" v-show="!(songId == entry.song.id)">{{entry.queueIndex + 1}}</div>
                 </div>
                 <div class="item-info">
                   <span class="item-name">{{entry.song.common.title || entry.song.common.localTitle}}</span>
@@ -223,11 +242,12 @@
         flex-direction: column;
         gap: 12Px;
         padding-top: 12Px;
-        .local-search-bar{
+        .local-list-tools{
           display: flex;
           justify-content: center;
+          align-items: center;
           :deep(.song-filter-input){
-            width: 130px;
+            width: 160px;
             max-width: 100%;
           }
           :deep(.song-filter-input .filter-input){

@@ -29,16 +29,16 @@
 
 <template>
   <div class="my-music" :class="{'my-music-full': !playerStore.songList}">
-    <div class="music-library" v-if="user">
+    <div class="music-library" v-if="user || userStore.localOnlyMode">
       <LibraryType class="library-type"></LibraryType>
-      <LibraryList v-show="listType1 != 2 && listType1 != 3" class="library-list"></LibraryList>
-      <DownloadList v-show="listType1 == 2 && listType2 == 0" class="download-list"></DownloadList>
-      <LocalMusicList :folderlist="downloadedMusicFolder" type="downloaded" v-if="downloadedMusicFolder" v-show="listType1 == 2 && listType2 == 1" class="local-list"></LocalMusicList>
+      <LibraryList v-if="!userStore.localOnlyMode" v-show="listType1 != 2 && listType1 != 3" class="library-list"></LibraryList>
+      <DownloadList v-if="!userStore.localOnlyMode" v-show="listType1 == 2 && listType2 == 0" class="download-list"></DownloadList>
+      <LocalMusicList :folderlist="downloadedMusicFolder" type="downloaded" v-if="!userStore.localOnlyMode && downloadedMusicFolder" v-show="listType1 == 2 && listType2 == 1" class="local-list"></LocalMusicList>
       <LocalMusicList :folderlist="localMusicFolder" :classifylist="localMusicClassify" type="local" v-if="localMusicFolder" v-show="listType1 == 3" class="local-list"></LocalMusicList>
-      <div class="no-folder" @click="router.push('/settings')" v-if="!downloadedFolderSettings && listType1 == 2 && listType2 == 1">去设置下载地址</div>
+      <div class="no-folder" @click="router.push('/settings')" v-if="!userStore.localOnlyMode && !downloadedFolderSettings && listType1 == 2 && listType2 == 1">去设置下载地址</div>
       <div class="no-folder" @click="router.push('/settings')" v-if="localFolderSettings.length == 0 && listType1 == 3">去设置扫描地址</div>
     </div>
-      <div class="library-view" :class="{'library-view-nologin': !user}">
+      <div class="library-view" :class="{'library-view-nologin': !user && !userStore.localOnlyMode}">
         <router-view v-slot="{ Component }">
           <keep-alive :include="['LibraryDetail','LibrarySongList','LibraryAlbumList','LibraryMVList']">
             <Transition name="fade">

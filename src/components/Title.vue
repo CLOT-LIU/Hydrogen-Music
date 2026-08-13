@@ -10,6 +10,7 @@
   import { getIndexedSong } from '../utils/songList';
   import { getSongCoverUrl, withCoverParam } from '../utils/coverBackdrop';
   import { useStableImageSource } from '../composables/useStableImageSource';
+  import defaultLocalCover from '../assets/icon/icon.png';
   const router = useRouter()
   const playerStore = usePlayerStore()
   const { widgetState, lyricShow, musicVideo, videoIsPlaying, songList, currentIndex, songId, localBase64Img, progress, time, playerShow, showSongTranslation } = storeToRefs(playerStore)
@@ -68,7 +69,7 @@
         <div class="cover">
           <img v-if="currentSong.type != 'local' && displayedCurrentSongCoverUrl" :src="displayedCurrentSongCoverUrl" alt="">
           <img v-else-if="localBase64Img" :src="localBase64Img" alt="">
-          <img v-else src="https://p3.music.126.net/UeTuwE7pvjBpypWLudqukA==/3132508627578625.jpg?param=140y140" alt="">
+          <img v-else :src="defaultLocalCover" alt="">
         </div>
         <div class="music-info">
           <span class="music-name">{{getSongDisplayName(currentSong, '', showSongTranslation)}}</span>

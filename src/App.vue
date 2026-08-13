@@ -11,6 +11,7 @@ import { destroyLyricRuntime, initLyricRuntime } from './composables/usePlayerRu
 
 import { usePlayerStore } from './store/playerStore';
 import { useOtherStore } from './store/otherStore';
+import { useUserStore } from './store/userStore';
 
 const MusicPlayer = defineAsyncComponent(() => import('./views/MusicPlayer.vue'));
 const VideoPlayer = defineAsyncComponent(() => import('./components/VideoPlayer.vue'));
@@ -21,6 +22,7 @@ const Update = defineAsyncComponent(() => import('./components/Update.vue'));
 
 const playerStore = usePlayerStore();
 const otherStore = useOtherStore();
+const userStore = useUserStore();
 const visualizerActive = computed(() => {
     return playerStore.audioVisualizer && playerStore.playerShow && !playerStore.widgetState && !!playerStore.currentMusic;
 });
@@ -55,7 +57,7 @@ const handleTitleBarDoubleClick = () => {
     <div class="globalWidget" :class="{ 'visualizer-active': visualizerActive }">
         <Title class="widget-title"></Title>
         <AudioVisualizer class="widget-visualizer"></AudioVisualizer>
-        <div class="widget-search">
+        <div class="widget-search" v-if="!userStore.localOnlyMode">
             <SearchInput></SearchInput>
         </div>
     </div>
@@ -230,12 +232,26 @@ const handleTitleBarDoubleClick = () => {
     z-index: 999;
 }
 
-.home-enter-active,
+.home-enter-active {
+    transition: opacity 0.4s cubic-bezier(0.14, 0.91, 0.58, 1);
+}
+
+.home-enter-active .home-content {
+    transition: transform 0.4s cubic-bezier(0.14, 0.91, 0.58, 1);
+}
+
+.home-enter-from {
+    opacity: 0;
+}
+
+.home-enter-from .home-content {
+    transform: scale(0.9);
+}
+
 .home-leave-active {
     transition: 0.4s cubic-bezier(0.14, 0.91, 0.58, 1);
 }
 
-.home-enter-from,
 .home-leave-to {
     transform: scale(0.9);
     opacity: 0;
