@@ -4,7 +4,7 @@ import { songTime as formatSongTime, songTime2 as formatSongProgressTime } from 
 import { noticeOpen } from './dialog'
 import { checkMusic, likeMusic } from '../api/song'
 import { getSirenLyricText, getSirenSong } from '../api/siren'
-import { updatePlaylist } from '../api/playlist'
+import { getIntelligenceList, getPlaylistAll, updatePlaylist } from '../api/playlist'
 import { getLikelist, getUserPlaylist } from '../api/user'
 import { useUserStore } from '../store/userStore'
 import { usePlayerStore } from '../store/playerStore'
@@ -84,6 +84,8 @@ let streamRecoveryAttempts = 0
 let pendingShuffledCycle = null
 let pendingShuffledCycleSignature = ''
 let onlinePlaybackSnapshot = null
+let intelligenceModeLoading = false
+let intelligenceSourceSnapshot = null
 const levelFieldMap = {
     standard: 'l',
     higher: 'm',
@@ -1015,6 +1017,13 @@ function applyPlayMode(mode, options = {}) {
     const inFM = Object.prototype.hasOwnProperty.call(options, 'inFM') ? options.inFM : isPersonalFMContext()
     const syncExternal = options.syncExternal !== false
     const nextMode = normalizePlayMode(mode, inFM)
+
+    if (listInfo.value?.type === 'intelligence' && options.preserveIntelligence !== true) {
+        listInfo.value = {
+            ...listInfo.value,
+            type: 'playlist',
+        }
+    }
     playMode.value = nextMode
 
     if (currentMusic.value && typeof currentMusic.value.loop === 'function') {
@@ -2679,11 +2688,30 @@ export function changeProgressByDragEnd(toTime) {
     if (playing.value) startProgress({ immediate: false })
 }
 // ------------
-export function changePlayMode() {
+function isFavoritePlaylistPlaybackContext() {
+    const favoritePlaylistId = userStore.favoritePlaylistId
+    const currentListType = String(listInfo.value?.type || '').replace(/^~/, '')
+    return !!favoritePlaylistId
+        && currentListType === 'playlist'
+        && String(listInfo.value?.id ?? '') === String(favoritePlaylistId)
+}
+
+export async function changePlayMode() {
     if (isPersonalFMContext()) {
         applyPlayMode(playMode.value == 2 ? 3 : 2, { inFM: true })
         return
     }
+
+    if (listInfo.value?.type === 'intelligence') {
+        await restoreFavoritePlaylistAfterIntelligence()
+        return
+    }
+
+    if (playMode.value == 3 && isFavoritePlaylistPlaybackContext()) {
+        await startIntelligencePlayback({ preserveCurrent: true })
+        return
+    }
+
     applyPlayMode(playMode.value != 3 ? playMode.value + 1 : 0, { inFM: false })
 }
 
@@ -2695,6 +2723,155 @@ export function playAll(listType, list, listMeta = null) {
     } else {
         addToList(listType, list, listMeta)
         addSong(songList.value[0].id, 0, true)
+    }
+}
+
+export async function playIntelligenceList(list, listMeta = null, options = {}) {
+    const normalizedList = normalizeQueueSongs(list)
+    if (normalizedList.length == 0) return false
+
+    // 心动模式的顺序由服务端编排，不能再套用普通随机播放。
+    applyPlayMode(0, { inFM: false })
+    addToList('intelligence', normalizedList, listMeta)
+
+    const preservedIndex = options.preserveCurrent === true
+        ? normalizedList.findIndex(song => String(song?.id ?? '') === String(songId.value ?? ''))
+        : -1
+    if (preservedIndex >= 0) {
+        setId(songId.value, preservedIndex)
+        savePlaylist()
+        scheduleNextSongAssetPrefetch()
+        return true
+    }
+
+    await addSong(normalizedList[0].id, 0, true)
+    return true
+}
+
+async function resolveFavoritePlaylistSongs(playlistId) {
+    const normalizedPlaylistId = String(playlistId || '')
+    if (!normalizedPlaylistId) return []
+
+    if (
+        intelligenceSourceSnapshot
+        && String(intelligenceSourceSnapshot.playlistId || '') === normalizedPlaylistId
+        && Array.isArray(intelligenceSourceSnapshot.songs)
+    ) {
+        return normalizeQueueSongs(intelligenceSourceSnapshot.songs)
+    }
+
+    const cachedSongs = libraryStore.detailCache?.[`playlist:${normalizedPlaylistId}`]?.librarySongs
+    if (Array.isArray(cachedSongs) && cachedSongs.length > 0) return normalizeQueueSongs(cachedSongs)
+
+    const result = await getPlaylistAll({ id: normalizedPlaylistId })
+    return normalizeQueueSongs(result?.songs || [])
+}
+
+async function restoreFavoritePlaylistAfterIntelligence() {
+    const playlistId = intelligenceSourceSnapshot?.playlistId || userStore.favoritePlaylistId || listInfo.value?.id
+    try {
+        const favoriteSongs = await resolveFavoritePlaylistSongs(playlistId)
+        if (favoriteSongs.length == 0) throw new Error('favorite-playlist-empty')
+
+        const playingSongId = songId.value
+        const currentFavoriteIndex = favoriteSongs.findIndex(song => String(song?.id ?? '') === String(playingSongId ?? ''))
+        const returnSongId = intelligenceSourceSnapshot?.returnSongId
+        const returnSongIndex = favoriteSongs.findIndex(song => String(song?.id ?? '') === String(returnSongId ?? ''))
+
+        applyPlayMode(0, { inFM: false })
+        addToList('playlist', favoriteSongs, { id: playlistId })
+
+        if (currentFavoriteIndex >= 0) {
+            setId(playingSongId, currentFavoriteIndex)
+            savePlaylist()
+            scheduleNextSongAssetPrefetch()
+        } else {
+            const targetIndex = returnSongIndex >= 0 ? returnSongIndex : 0
+            await addSong(favoriteSongs[targetIndex].id, targetIndex, true)
+        }
+
+        intelligenceSourceSnapshot = null
+        noticeOpen('已切换回我喜欢的音乐', 2)
+        return true
+    } catch (error) {
+        console.error('恢复我喜欢的音乐失败:', error)
+        noticeOpen('暂时无法恢复我喜欢的音乐，请稍后重试', 2)
+        return false
+    }
+}
+
+function normalizeIntelligenceSongs(result) {
+    const responseItems = Array.isArray(result?.data)
+        ? result.data
+        : (Array.isArray(result?.body?.data) ? result.body.data : [])
+    const songs = responseItems
+        .map(item => item?.songInfo || item?.song || item)
+        .filter(song => song && song.id)
+    const seenIds = new Set()
+
+    return songs.filter(song => {
+        const songKey = String(song.id)
+        if (seenIds.has(songKey)) return false
+        seenIds.add(songKey)
+        return true
+    })
+}
+
+export async function startIntelligencePlayback(options = {}) {
+    if (intelligenceModeLoading) return false
+    if (!userStore.user?.userId) {
+        noticeOpen('登录后才能使用心动模式', 2)
+        return false
+    }
+
+    intelligenceModeLoading = true
+    try {
+        const playlistId = options.playlistId || userStore.favoritePlaylistId || listInfo.value?.id
+        const sourceSongs = normalizeQueueSongs(options.songs || songList.value)
+        const likedSongIds = new Set((Array.isArray(userStore.likelist) ? userStore.likelist : []).map(id => String(id)))
+        const currentSong = sourceSongs.find(song => (
+            String(song?.id ?? '') === String(songId.value ?? '')
+            && likedSongIds.has(String(song?.id ?? ''))
+        ))
+        const seedSong = currentSong || sourceSongs.find(song => likedSongIds.has(String(song?.id ?? '')))
+
+        if (!playlistId || !seedSong) {
+            noticeOpen('我喜欢的音乐里还没有歌曲', 2)
+            return false
+        }
+
+        const result = await getIntelligenceList({
+            id: seedSong.id,
+            pid: playlistId,
+            sid: seedSong.id,
+            count: 1,
+        })
+        if (Number(result?.code) !== 200) {
+            throw new Error(result?.message || result?.msg || 'intelligence-list-failed')
+        }
+
+        const recommendedSongs = normalizeIntelligenceSongs(result)
+        const queue = [seedSong, ...recommendedSongs.filter(song => String(song.id) !== String(seedSong.id))]
+        if (queue.length < 2) throw new Error('intelligence-list-empty')
+
+        const sourceSnapshot = {
+            playlistId,
+            songs: sourceSongs,
+            returnSongId: seedSong.id,
+        }
+        const preserveCurrent = options.preserveCurrent === true
+            && String(songId.value ?? '') === String(seedSong.id)
+        const started = await playIntelligenceList(queue, { id: playlistId }, { preserveCurrent })
+        if (!started) throw new Error('intelligence-play-failed')
+        intelligenceSourceSnapshot = sourceSnapshot
+        noticeOpen(`心动模式已开启 · ${queue.length} 首`, 2)
+        return true
+    } catch (error) {
+        console.error('开启心动模式失败:', error)
+        noticeOpen('心动模式暂不可用，请稍后重试', 2)
+        return false
+    } finally {
+        intelligenceModeLoading = false
     }
 }
 
