@@ -64,10 +64,11 @@ import request from '../utils/request'
  * @param {*} id 
  * @returns 
  */
- export function getLikelist(id) {
+ export function getLikelist(id, options = {}) {
     return request({
       url: '/likelist',
       method: 'get',
+      suppressGlobalNotice: options.silent === true,
       params: {
         id: id,
         timestamp: new Date().getTime(),

@@ -8,6 +8,7 @@ import WindowControl from './components/WindowControl.vue';
 import MusicWidget from './components/MusicWidget.vue';
 import { destroyDesktopLyric, initDesktopLyric } from './utils/desktopLyric';
 import { destroyLyricRuntime, initLyricRuntime } from './composables/usePlayerRuntime';
+import { useFavoritePlaylistSync } from './composables/useFavoritePlaylistSync';
 
 import { usePlayerStore } from './store/playerStore';
 import { useOtherStore } from './store/otherStore';
@@ -23,6 +24,7 @@ const Update = defineAsyncComponent(() => import('./components/Update.vue'));
 const playerStore = usePlayerStore();
 const otherStore = useOtherStore();
 const userStore = useUserStore();
+useFavoritePlaylistSync();
 const visualizerActive = computed(() => {
     return playerStore.audioVisualizer && playerStore.playerShow && !playerStore.widgetState && !!playerStore.currentMusic;
 });
