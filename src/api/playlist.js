@@ -32,10 +32,11 @@ export function getTopList() {
  * 接口获取所有歌曲的详情。
  * @returns 
  */
-export function getPlaylistDetail(params) {
+export function getPlaylistDetail(params, options = {}) {
     return request({
       url: '/playlist/detail',
       method: 'get',
+      suppressGlobalNotice: options.silent === true,
       params,
     });
 }

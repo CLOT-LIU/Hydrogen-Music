@@ -308,7 +308,9 @@ request.interceptors.response.use(function (response) {
   }
 
   // 对 /like 与 /playlist/tracks 的错误不进行全局提示，这些操作由调用方负责降级与提示
-  const suppressGlobalNotice = url === '/like' || url === '/playlist/tracks'
+  const suppressGlobalNotice = url === '/like'
+    || url === '/playlist/tracks'
+    || error?.config?.suppressGlobalNotice === true
   if (!suppressGlobalNotice) {
     if (msg) noticeOpen(`请求错误：${msg}`, 2)
     else if (status) noticeOpen(`请求错误 (${status})`, 2)
