@@ -51,7 +51,11 @@
     lyricShow.value = false
   }
   const removeHidePlayerListener = windowApi.hidePlayer(() => {
-    if(!widgetState.value) backHome()
+    if(!widgetState.value) {
+      backHome()
+      return
+    }
+    if(router.currentRoute.value.name === 'sirenAlbum') router.push('/siren')
   })
 
   onBeforeUnmount(() => {
