@@ -71,6 +71,7 @@ export const useLibraryStore = defineStore('libraryStore', {
             playlistUserCreated: null,
             playlistUserSub: null,
             playlistOverviewVersion: 0,
+            playlistOverviewRefreshSilent: false,
             libraryInfo: null,
             lastLibraryRoute: null,
             lastLibraryScrollTop: 0,
@@ -108,7 +109,8 @@ export const useLibraryStore = defineStore('libraryStore', {
             this.playlistUserCreated = playlist.splice(0, this.playlistCount.createdPlaylistCount)
             this.playlistUserSub = playlist.splice(0, this.playlistCount.subPlaylistCount)
         },
-        markPlaylistOverviewStale() {
+        markPlaylistOverviewStale({ silent = false } = {}) {
+            this.playlistOverviewRefreshSilent = silent
             this.playlistOverviewVersion += 1
         },
         updatePlaylistOverviewTrackCount(playlistId, delta) {
@@ -174,6 +176,7 @@ export const useLibraryStore = defineStore('libraryStore', {
             this.playlistUserCreated = null
             this.playlistUserSub = null
             this.playlistOverviewVersion = 0
+            this.playlistOverviewRefreshSilent = false
             this.libraryInfo = null
             this.lastLibraryRoute = null
             this.lastLibraryScrollTop = 0
@@ -361,7 +364,7 @@ export const useLibraryStore = defineStore('libraryStore', {
                 await task.catch(() => null)
             }
         },
-        async hydratePlaylistRemaining(id, totalTracks, token, initialLoaded = 0) {
+        async hydratePlaylistRemaining(id, totalTracks, token, initialLoaded = 0, options = {}) {
             const offsets = []
             const parsedInitialLoaded = Number(initialLoaded)
             const safeInitialLoaded = Number.isFinite(parsedInitialLoaded) ? Math.max(0, parsedInitialLoaded) : 0
@@ -386,7 +389,7 @@ export const useLibraryStore = defineStore('libraryStore', {
                         limit: PLAYLIST_PAGE_SIZE,
                         offset,
                     }
-                    const result = await getPlaylistAll(params)
+                    const result = await getPlaylistAll(params, options)
                     if (this.playlistHydrationToken != token) return
 
                     const songs = mapSongsPlayableStatus(result?.songs || [], result?.privileges || []) || []
@@ -419,8 +422,8 @@ export const useLibraryStore = defineStore('libraryStore', {
             }
             this.indexLibrarySongs(songs, { append: true })
         },
-        startPlaylistHydrationTask(playlistId, totalTracks, token, loadedTracks) {
-            const hydrationTask = this.hydratePlaylistRemaining(playlistId, totalTracks, token, loadedTracks)
+        startPlaylistHydrationTask(playlistId, totalTracks, token, loadedTracks, options = {}) {
+            const hydrationTask = this.hydratePlaylistRemaining(playlistId, totalTracks, token, loadedTracks, options)
                 .then(remainingSongs => {
                     if (this.playlistHydrationToken != token) return
                     this.appendHydratedPlaylistSongs(remainingSongs)
@@ -500,7 +503,8 @@ export const useLibraryStore = defineStore('libraryStore', {
             this.cacheCurrentLibraryDetail(id, routerName)
         },
         async updatePlaylistDetail(id, options = {}) {
-            const { deferRemaining = false } = options
+            const { deferRemaining = false, silent = false } = options
+            const requestOptions = { silent }
             const playlistId = String(id || '')
             const token = createPlaylistHydrationToken(playlistId)
             this.playlistHydrationToken = token
@@ -519,9 +523,9 @@ export const useLibraryStore = defineStore('libraryStore', {
             }
             try {
                 const [playlistDetailResult, playlistTrackResult, playlistDynamicResult] = await Promise.all([
-                    getPlaylistDetail(params),
-                    getPlaylistAll(params),
-                    playlistDynamic(playlistId),
+                    getPlaylistDetail(params, requestOptions),
+                    getPlaylistAll(params, requestOptions),
+                    playlistDynamic(playlistId, requestOptions),
                 ])
                 if (this.playlistHydrationToken != token) return
 
@@ -555,7 +559,7 @@ export const useLibraryStore = defineStore('libraryStore', {
                     status: 'loading',
                 })
 
-                const hydrationTask = this.startPlaylistHydrationTask(playlistId, totalTracks, token, loadedTracks)
+                const hydrationTask = this.startPlaylistHydrationTask(playlistId, totalTracks, token, loadedTracks, requestOptions)
                 this.libraryChangeAnimation = false
                 if (!deferRemaining) await hydrationTask
             } catch (error) {

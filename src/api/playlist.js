@@ -49,10 +49,11 @@ export function getPlaylistDetail(params, options = {}) {
  * @param {*} params 
  * @returns 
  */
-export function getPlaylistAll(params) {
+export function getPlaylistAll(params, options = {}) {
     return request({
       url: '/playlist/track/all',
       method: 'get',
+      suppressGlobalNotice: options.silent === true,
       params,
     });
 }
@@ -139,10 +140,11 @@ export function subPlaylist(params) {
  * @param {*} params 
  * @returns 
  */
-export function playlistDynamic(id) {
+export function playlistDynamic(id, options = {}) {
     return request({
       url: '/playlist/detail/dynamic',
       method: 'get',
+      suppressGlobalNotice: options.silent === true,
       params: {
         id: id,
         timestamp: new Date().getTime(),

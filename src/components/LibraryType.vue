@@ -17,7 +17,7 @@
   const { user } = storeToRefs(userStore)
   const libraryStore = useLibraryStore()
   const { changeLibraryList, updateUserPlaylistCount, updateUserPlaylist } = libraryStore
-  const { libraryList, libraryListAlbum, libraryListAritist, listType1, listType2, playlistOverviewVersion } = storeToRefs(libraryStore)
+  const { libraryList, libraryListAlbum, libraryListAritist, listType1, listType2, playlistOverviewVersion, playlistOverviewRefreshSilent } = storeToRefs(libraryStore)
   const localStore = useLocalStore()
 
   const typeTracker = ref(0)
@@ -59,7 +59,7 @@
     libraryStore.setPlaylistOverviewTrackCount(playlistId, userStore.likelist.length)
   }
 
-  async function loadUserPlaylist(requestToken, requestUserId) {
+  async function loadUserPlaylist(requestToken, requestUserId, options = {}) {
     if (!requestUserId) {
       clearAccountLibraryLists()
       return false
@@ -73,12 +73,12 @@
     }
 
     try {
-      const listCount = await getUserPlaylistCount()
+      const listCount = await getUserPlaylistCount(options)
       if (!isLibraryRequestActive(requestToken, requestUserId)) return false
 
       updateUserPlaylistCount(listCount)
 
-      const list = await getUserPlaylist(params)
+      const list = await getUserPlaylist(params, options)
       if (!isLibraryRequestActive(requestToken, requestUserId)) return false
 
       updateUserPlaylist(Array.isArray(list?.playlist) ? list.playlist : [])
@@ -141,7 +141,7 @@
     }
   }
 
-  async function refreshCurrentSection() {
+  async function refreshCurrentSection(options = {}) {
     const requestUserId = getCurrentUserId()
     const requestToken = ++libraryRequestToken
 
@@ -159,7 +159,7 @@
     }
 
     if (option.value == 0) {
-      const loaded = await loadUserPlaylist(requestToken, requestUserId)
+      const loaded = await loadUserPlaylist(requestToken, requestUserId, options)
       if (!loaded || !isLibraryRequestActive(requestToken, requestUserId)) return false
       listType2.value = typeOne.value == 0 ? 0 : 1
       changeLibraryList(typeOne.value == 0 ? 0 : 1)
@@ -279,7 +279,7 @@
     version => {
       if (version === lastHandledPlaylistOverviewVersion.value) return
       if (option.value != 0) return
-      void refreshCurrentSection()
+      void refreshCurrentSection({ silent: playlistOverviewRefreshSilent.value })
     }
   )
 
@@ -288,7 +288,7 @@
     const needsUserReload = (option.value == 0 || option.value == 1) && currentUserId && lastLoadedUserId.value !== currentUserId
     const needsPlaylistOverviewReload = option.value == 0 && playlistOverviewVersion.value !== lastHandledPlaylistOverviewVersion.value
     if (needsUserReload || needsPlaylistOverviewReload) {
-      void refreshCurrentSection()
+      void refreshCurrentSection({ silent: needsPlaylistOverviewReload && playlistOverviewRefreshSilent.value })
     }
   })
 

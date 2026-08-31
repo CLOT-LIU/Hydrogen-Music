@@ -18,20 +18,22 @@ const getLikelistSignature = ids => {
 
 const getPlaylistSignature = playlist => {
     if (!playlist) return ''
-    const trackIds = Array.isArray(playlist.trackIds)
-        ? playlist.trackIds.map(track => String(track?.id ?? track)).join(',')
-        : ''
+    const hasTrackIds = Array.isArray(playlist.trackIds)
+    const trackIds = hasTrackIds
+        ? playlist.trackIds.map(track => String(track?.id ?? track))
+        : []
+    const trackCount = hasTrackIds ? trackIds.length : Number(playlist.trackCount ?? 0)
 
     return JSON.stringify([
         String(playlist.id ?? ''),
         playlist.name ?? '',
         playlist.coverImgUrl ?? '',
         playlist.description ?? '',
-        Number(playlist.trackCount ?? 0),
+        trackCount,
         Number(playlist.updateTime ?? 0),
         Number(playlist.trackUpdateTime ?? 0),
         Number(playlist.trackNumberUpdateTime ?? 0),
-        trackIds,
+        trackIds.join(','),
     ])
 }
 
@@ -71,7 +73,7 @@ export function usePlaylistSync() {
         const now = Date.now()
         if (!force && now - lastOverviewRefreshAt < PLAYLIST_SYNC_MIN_INTERVAL) return false
         lastOverviewRefreshAt = now
-        libraryStore.markPlaylistOverviewStale()
+        libraryStore.markPlaylistOverviewStale({ silent: true })
         return true
     }
 
@@ -134,13 +136,18 @@ export function usePlaylistSync() {
             const result = await getPlaylistDetail({ id: playlistId, timestamp: Date.now() }, { silent: true })
             if (getCurrentPlaylistId() != playlistId) return false
 
+            const activePlaylist = String(libraryStore.libraryInfo?.id || '') == playlistId
+                ? libraryStore.libraryInfo
+                : null
+            if (getPlaylistSignature(activePlaylist) != currentSignature) return false
+
             const latestPlaylist = result?.playlist || null
             if (!latestPlaylist || getPlaylistSignature(latestPlaylist) == currentSignature) return false
 
             schedulePlaylistCacheInvalidation()
             requestPlaylistOverviewRefresh()
             libraryStore.invalidatePlaylistDetailCache(playlistId)
-            await libraryStore.updatePlaylistDetail(playlistId, { deferRemaining: true })
+            await libraryStore.updatePlaylistDetail(playlistId, { deferRemaining: true, silent: true })
             return true
         })().catch(error => {
             console.warn('同步歌单失败:', error)
