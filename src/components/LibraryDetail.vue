@@ -7,7 +7,7 @@ import { subPlaylist } from '../api/playlist';
 import { subAlbum } from '../api/album';
 import { subArtist } from '../api/artist';
 import { formatTime } from '../utils/time';
-import { playAll, startIntelligencePlayback } from '../utils/player/lazy';
+import { playAll } from '../utils/player/lazy';
 import { scheduleAlbumSublistCacheInvalidation, scheduleArtistSublistCacheInvalidation } from '../utils/cacheInvalidation';
 import { matchSearchText, normalizeSongFilterKeyword } from '../utils/songFilter';
 import { createSongSortOptions, sortSongEntries } from '../utils/songSort';
@@ -17,13 +17,11 @@ import LibraryMVList from '../components/LibraryMVList.vue';
 import SongFilterInput from './SongFilterInput.vue';
 import SongSortControl from './SongSortControl.vue';
 import { usePlayerStore } from '../store/playerStore';
-import { useUserStore } from '../store/userStore';
 import { useLibraryStore } from '../store/libraryStore';
 import { useLocalStore } from '../store/localStore';
 import { storeToRefs } from 'pinia';
 
 const playerStore = usePlayerStore();
-const userStore = useUserStore();
 const localStore = useLocalStore();
 const libraryStore = useLibraryStore();
 const { updateLibraryDetail, updateArtistTopSong, updateArtistAlbum, updateArtistsMV, waitForPlaylistHydration, saveDetailScroll, getDetailScroll } = libraryStore;
@@ -37,7 +35,6 @@ const introduceDetailShow = ref(false);
 const introduceDetailShowDelay = ref(false);
 const songSearchKeyword = ref('');
 const songSortMode = ref('default');
-const intelligenceLoading = ref(false);
 
 const canGoBack = ref(false);
 const canGoForward = ref(false);
@@ -205,19 +202,6 @@ const resetSongSearchResultScroll = async () => {
 };
 const currentLibraryRouteName = computed(() => normalizeRouteName(router.currentRoute.value.name));
 const isPlaylistRoute = computed(() => currentLibraryRouteName.value == 'playlist');
-const isFavoritePlaylist = computed(() => {
-    if (!isPlaylistRoute.value || !libraryInfo.value) return false;
-    if (userStore.favoritePlaylistId && String(libraryInfo.value.id) == String(userStore.favoritePlaylistId)) return true;
-
-    const playlistName = String(libraryInfo.value.name || '').trim();
-    return Number(libraryInfo.value.specialType) === 5
-        || playlistName === '我喜欢的音乐'
-        || playlistName.endsWith('喜欢的音乐');
-});
-const isIntelligencePlaying = computed(() => {
-    return playerStore.listInfo?.type === 'intelligence'
-        && String(playerStore.listInfo?.id ?? '') === String(libraryInfo.value?.id ?? '');
-});
 const isAlbumRoute = computed(() => currentLibraryRouteName.value == 'album');
 const isArtistTopSongRoute = computed(() => currentLibraryRouteName.value == 'artist' && artistPageType.value == 0);
 const isArtistAlbumRoute = computed(() => currentLibraryRouteName.value == 'artist' && artistPageType.value == 1);
@@ -527,23 +511,6 @@ const playAllSafe = async () => {
     playAll(router.currentRoute.value.name || 'other', sortedLibrarySongs.value);
 };
 
-const startIntelligenceMode = async () => {
-    if (intelligenceLoading.value) return;
-
-    intelligenceLoading.value = true;
-    try {
-        await waitCurrentPlaylistHydration();
-        const favoriteSongs = Array.isArray(librarySongs.value) ? librarySongs.value : [];
-        const playlistId = libraryInfo.value?.id || userStore.favoritePlaylistId;
-        await startIntelligencePlayback({
-            songs: favoriteSongs,
-            playlistId,
-        });
-    } finally {
-        intelligenceLoading.value = false;
-    }
-};
-
 //下载本歌单/专辑全部歌曲
 const downloadAll = async () => {
     await waitCurrentPlaylistHydration();
@@ -752,26 +719,6 @@ const onAfterLeave = () => (introduceDetailShowDelay.value = false);
                     </svg>
                     <span @click="playAllSafe()">播放全部</span>
                 </div>
-                <button
-                    v-if="isFavoritePlaylist"
-                    class="intelligence-button"
-                    :class="{ 'is-active': isIntelligencePlaying, 'is-loading': intelligenceLoading }"
-                    :disabled="intelligenceLoading"
-                    type="button"
-                    :aria-label="intelligenceLoading ? '正在生成心动模式播放列表' : '开启心动模式'"
-                    @click="startIntelligenceMode"
-                >
-                    <span class="heartbeat-mark" aria-hidden="true">
-                        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                            <path class="heart-shape" d="M16 27.2S4.7 20.5 4.7 11.9C4.7 7.7 7.4 5 11.1 5c2.2 0 4 1.1 4.9 2.8C16.9 6.1 18.7 5 20.9 5c3.7 0 6.4 2.7 6.4 6.9C27.3 20.5 16 27.2 16 27.2Z" />
-                            <path class="heart-trace" d="M8.4 16h4.2l1.7-3.6 3 7.2 2-3.6h4.3" />
-                        </svg>
-                    </span>
-                    <span class="intelligence-copy">
-                        <span class="intelligence-name">{{ intelligenceLoading ? '正在生成' : '心动模式' }}</span>
-                        <span class="intelligence-en">HEARTBEAT</span>
-                    </span>
-                </button>
                 <div class="playall-line"></div>
                 <span @click="playAllSafe()" class="playall-en">PLAYALL</span>
             </div>
@@ -826,9 +773,6 @@ const onAfterLeave = () => (introduceDetailShowDelay.value = false);
     --ld-overlay-border: rgba(255, 255, 255, 0.12);
     --ld-overlay-text: rgba(255, 255, 255, 0.92);
     --ld-overlay-corner: rgba(247, 247, 247, 0.9);
-    --ld-heart: #e83c3c;
-    --ld-heart-soft: rgba(232, 60, 60, 0.1);
-
     width: 100%;
     height: 100%;
     display: flex;
@@ -1189,88 +1133,6 @@ const onAfterLeave = () => (introduceDetailShowDelay.value = false);
                 height: 0.5px;
                 background-color: var(--ld-line);
             }
-            .intelligence-button {
-                min-width: 112px;
-                height: 34px;
-                margin: 0 12px;
-                padding: 0 12px 0 8px;
-                display: flex;
-                align-items: center;
-                gap: 7px;
-                border: 1px solid color-mix(in srgb, var(--ld-heart) 70%, transparent);
-                border-radius: 17px;
-                background: transparent;
-                color: var(--ld-heart);
-                transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-                &:hover:not(:disabled) {
-                    cursor: pointer;
-                    background: var(--ld-heart-soft);
-                    box-shadow: 0 4px 14px rgba(232, 60, 60, 0.14);
-                    transform: translateY(-1px);
-                }
-                &:active:not(:disabled) {
-                    transform: translateY(0) scale(0.97);
-                }
-                &:focus-visible {
-                    outline: 2px solid var(--ld-heart);
-                    outline-offset: 2px;
-                }
-                &:disabled {
-                    cursor: wait;
-                }
-                &.is-active {
-                    background: var(--ld-heart);
-                    color: #ffffff;
-                    border-color: var(--ld-heart);
-                    box-shadow: 0 4px 14px rgba(232, 60, 60, 0.2);
-                }
-                .heartbeat-mark {
-                    width: 22px;
-                    height: 22px;
-                    flex: 0 0 22px;
-                    display: block;
-                    svg {
-                        width: 100%;
-                        height: 100%;
-                        overflow: visible;
-                    }
-                    .heart-shape {
-                        fill: currentColor;
-                        stroke: currentColor;
-                        stroke-width: 1.2;
-                    }
-                    .heart-trace {
-                        fill: none;
-                        stroke: #ffffff;
-                        stroke-width: 1.8;
-                        stroke-linecap: round;
-                        stroke-linejoin: round;
-                    }
-                }
-                &:not(.is-active) .heartbeat-mark .heart-trace {
-                    stroke: var(--background, #ffffff);
-                }
-                .intelligence-copy {
-                    min-width: 0;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: flex-start;
-                    line-height: 1;
-                }
-                .intelligence-name {
-                    font: 11px SourceHanSansCN-Bold;
-                    white-space: nowrap;
-                }
-                .intelligence-en {
-                    margin-top: 2px;
-                    font: 5px Geometos;
-                    letter-spacing: 0.6px;
-                    opacity: 0.66;
-                }
-                &.is-loading .heartbeat-mark {
-                    animation: intelligence-heartbeat 0.9s ease-in-out infinite;
-                }
-            }
             .playall-en {
                 margin-left: 4px;
                 font: 8px Geometos;
@@ -1326,20 +1188,6 @@ const onAfterLeave = () => (introduceDetailShowDelay.value = false);
     }
 }
 
-@keyframes intelligence-heartbeat {
-    0%, 100% { transform: scale(1); }
-    18% { transform: scale(1.18); }
-    34% { transform: scale(0.96); }
-    50% { transform: scale(1.1); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .library-detail .library-option .library-playall .intelligence-button,
-    .library-detail .library-option .library-playall .intelligence-button .heartbeat-mark {
-        animation: none !important;
-        transition: none !important;
-    }
-}
 </style>
 
 <style lang="scss">
@@ -1358,7 +1206,6 @@ html.dark .library-detail,
     --ld-overlay-border: rgba(255, 255, 255, 0.18);
     --ld-overlay-text: rgba(241, 243, 245, 0.92);
     --ld-overlay-corner: rgba(241, 243, 245, 0.72);
-    --ld-heart-soft: rgba(232, 60, 60, 0.18);
 }
 
 .metro-enter-active {

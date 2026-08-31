@@ -1018,12 +1018,6 @@ function applyPlayMode(mode, options = {}) {
     const syncExternal = options.syncExternal !== false
     const nextMode = normalizePlayMode(mode, inFM)
 
-    if (listInfo.value?.type === 'intelligence' && options.preserveIntelligence !== true) {
-        listInfo.value = {
-            ...listInfo.value,
-            type: 'playlist',
-        }
-    }
     playMode.value = nextMode
 
     if (currentMusic.value && typeof currentMusic.value.loop === 'function') {
@@ -2726,7 +2720,7 @@ export function playAll(listType, list, listMeta = null) {
     }
 }
 
-export async function playIntelligenceList(list, listMeta = null, options = {}) {
+async function playIntelligenceList(list, listMeta = null, options = {}) {
     const normalizedList = normalizeQueueSongs(list)
     if (normalizedList.length == 0) return false
 
@@ -2752,22 +2746,11 @@ async function resolveFavoritePlaylistSongs(playlistId) {
     const normalizedPlaylistId = String(playlistId || '')
     if (!normalizedPlaylistId) return []
 
-    if (
-        intelligenceSourceSnapshot
-        && String(intelligenceSourceSnapshot.playlistId || '') === normalizedPlaylistId
-        && Array.isArray(intelligenceSourceSnapshot.songs)
-    ) {
-        return normalizeQueueSongs(intelligenceSourceSnapshot.songs)
-    }
-
-    const cachedSongs = libraryStore.detailCache?.[`playlist:${normalizedPlaylistId}`]?.librarySongs
-    if (Array.isArray(cachedSongs) && cachedSongs.length > 0) return normalizeQueueSongs(cachedSongs)
-
     const result = await getPlaylistAll({ id: normalizedPlaylistId })
     return normalizeQueueSongs(result?.songs || [])
 }
 
-async function restoreFavoritePlaylistAfterIntelligence() {
+async function restoreFavoritePlaylistAfterIntelligence(targetMode = 0) {
     const playlistId = intelligenceSourceSnapshot?.playlistId || userStore.favoritePlaylistId || listInfo.value?.id
     try {
         const favoriteSongs = await resolveFavoritePlaylistSongs(playlistId)
@@ -2778,18 +2761,18 @@ async function restoreFavoritePlaylistAfterIntelligence() {
         const returnSongId = intelligenceSourceSnapshot?.returnSongId
         const returnSongIndex = favoriteSongs.findIndex(song => String(song?.id ?? '') === String(returnSongId ?? ''))
 
-        applyPlayMode(0, { inFM: false })
         addToList('playlist', favoriteSongs, { id: playlistId })
 
         if (currentFavoriteIndex >= 0) {
             setId(playingSongId, currentFavoriteIndex)
-            savePlaylist()
             scheduleNextSongAssetPrefetch()
         } else {
             const targetIndex = returnSongIndex >= 0 ? returnSongIndex : 0
-            await addSong(favoriteSongs[targetIndex].id, targetIndex, true)
+            addSong(favoriteSongs[targetIndex].id, targetIndex, true)
         }
 
+        applyPlayMode(targetMode, { inFM: false })
+        savePlaylist()
         intelligenceSourceSnapshot = null
         noticeOpen('已切换回我喜欢的音乐', 2)
         return true
@@ -2798,6 +2781,14 @@ async function restoreFavoritePlaylistAfterIntelligence() {
         noticeOpen('暂时无法恢复我喜欢的音乐，请稍后重试', 2)
         return false
     }
+}
+
+function applyExternalPlayMode(mode, options = {}) {
+    if (listInfo.value?.type === 'intelligence') {
+        void restoreFavoritePlaylistAfterIntelligence(mode)
+        return
+    }
+    applyPlayMode(mode, options)
 }
 
 function normalizeIntelligenceSongs(result) {
@@ -2817,7 +2808,7 @@ function normalizeIntelligenceSongs(result) {
     })
 }
 
-export async function startIntelligencePlayback(options = {}) {
+async function startIntelligencePlayback(options = {}) {
     if (intelligenceModeLoading) return false
     if (!userStore.user?.userId) {
         noticeOpen('登录后才能使用心动模式', 2)
@@ -2856,7 +2847,6 @@ export async function startIntelligencePlayback(options = {}) {
 
         const sourceSnapshot = {
             playlistId,
-            songs: sourceSongs,
             returnSongId: seedSong.id,
         }
         const preserveCurrent = options.preserveCurrent === true
@@ -3607,7 +3597,7 @@ export function initPlayerExternalBridge() {
             else if (option == 'next') playNext()
         },
         onPlayModeChange(_event, mode) {
-            applyPlayMode(mode)
+            applyExternalPlayMode(mode)
         },
         onVolumeUp() {
             if (volume.value + 0.1 < 1) volume.value += 0.1
@@ -3660,7 +3650,7 @@ export function initPlayerExternalBridge() {
                     return
                 }
                 const mode = loopStatus === 'Track' ? 2 : loopStatus === 'Playlist' ? 1 : playMode.value === 3 ? 3 : 0
-                applyPlayMode(mode, { inFM: false })
+                applyExternalPlayMode(mode, { inFM: false })
                 return
             }
             changePlayMode()
@@ -3671,14 +3661,14 @@ export function initPlayerExternalBridge() {
                     if (shuffle || playMode.value === 3) applyPlayMode(shuffle ? 3 : 2, { inFM: true })
                     return
                 }
-                if (shuffle || playMode.value === 3) applyPlayMode(shuffle ? 3 : 0, { inFM: false })
+                if (shuffle || playMode.value === 3) applyExternalPlayMode(shuffle ? 3 : 0, { inFM: false })
                 return
             }
             if (isPersonalFMContext()) {
                 applyPlayMode(playMode.value === 2 ? 3 : 2, { inFM: true })
                 return
             }
-            applyPlayMode(playMode.value !== 3 ? 3 : 0, { inFM: false })
+            applyExternalPlayMode(playMode.value !== 3 ? 3 : 0, { inFM: false })
         },
         onPlayerVolumeChanged(value) {
             setVolumeForPlay(value)

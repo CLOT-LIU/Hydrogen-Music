@@ -829,8 +829,9 @@ const toggleDjSub = async isSubscribe => {
                     xmlns="http://www.w3.org/2000/svg"
                     aria-label="心动模式"
                 >
-                    <path class="heart-shape" d="M16 27.2S4.7 20.5 4.7 11.9C4.7 7.7 7.4 5 11.1 5c2.2 0 4 1.1 4.9 2.8C16.9 6.1 18.7 5 20.9 5c3.7 0 6.4 2.7 6.4 6.9C27.3 20.5 16 27.2 16 27.2Z" />
-                    <path class="heart-trace" d="M8.4 16h4.2l1.7-3.6 3 7.2 2-3.6h4.3" />
+                    <path class="intelligence-heart" fill="none" d="M16 26.4S6.3 20.7 6.3 13.1c0-3.8 2.4-6.2 5.6-6.2 1.9 0 3.3 0.9 4.1 2.5 0.8-1.6 2.2-2.5 4.1-2.5 3.2 0 5.6 2.4 5.6 6.2 0 7.6-9.7 13.3-9.7 13.3Z" />
+                    <path class="intelligence-trace" fill="none" d="M3.5 17h6l2-4.2 3.5 8.1 3.1-6.2 2.1 4.1h6.3" />
+                    <path class="intelligence-spark" fill="none" d="M25.8 3.6v3.5M24 5.4h3.6" />
                 </svg>
 
                 <!-- 歌词/评论切换按钮：本地歌曲隐藏评论按钮 -->
@@ -1250,17 +1251,14 @@ const toggleDjSub = async isSubscribe => {
                 display: none !important;
             }
             .intelligence-mode-icon {
-                color: #e5404f;
-                .heart-shape {
-                    fill: currentColor;
-                }
-                .heart-trace {
-                    fill: none;
-                    stroke: white;
-                    stroke-width: 1.6;
-                    stroke-linecap: round;
-                    stroke-linejoin: round;
-                }
+                fill: none;
+                stroke: currentColor;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                path { fill: none !important; }
+                .intelligence-heart { stroke-width: 1.7; }
+                .intelligence-trace { stroke-width: 2; }
+                .intelligence-spark { stroke-width: 1.6; }
             }
         }
     }

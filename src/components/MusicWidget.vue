@@ -246,8 +246,9 @@
             <!-- FM模式：显示随机播放图标 -->
             <svg t="1668787213634" @click="changePlayMode()" v-show="playMode == 3" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2661" width="200" height="200"><path d="M844.8 665.6c-6.4-6.4-16-12.8-25.6-9.6-19.2 0-35.2 16-35.2 35.2 0 9.6 6.4 19.2 12.8 25.6l41.6 41.6c-44.8-6.4-86.4-22.4-121.6-51.2-3.2 0-3.2-3.2-6.4-6.4L332.8 304C268.8 233.6 192 195.2 99.2 195.2c-19.2 0-35.2 16-35.2 35.2s16 32 35.2 32c73.6 0 134.4 32 182.4 86.4l384 400 6.4 6.4c48 38.4 108.8 64 172.8 70.4l-48 44.8c-9.6 6.4-16 19.2-16 28.8 0 19.2 19.2 35.2 38.4 32 9.6 0 19.2-6.4 25.6-12.8l99.2-92.8c16-16 16-41.6 0-57.6l-99.2-102.4z m-3.2-556.8c-12.8-16-32-19.2-48-6.4-9.6 6.4-12.8 16-12.8 25.6 0 12.8 3.2 22.4 16 28.8l41.6 41.6c-73.6 9.6-140.8 38.4-192 89.6l-115.2 118.4c-12.8 12.8-12.8 32 0 44.8 6.4 6.4 16 9.6 25.6 9.6s19.2-3.2 25.6-9.6l112-118.4c41.6-38.4 92.8-64 147.2-70.4l-44.8 44.8c-6.4 6.4-12.8 16-12.8 25.6 0 19.2 16 35.2 32 35.2 9.6 0 19.2-3.2 28.8-9.6L950.4 256c12.8-12.8 12.8-35.2 0-48l-108.8-99.2m-438.4 448c-9.6 0-19.2 3.2-25.6 9.6l-118.4 121.6c-48 44.8-96 67.2-160 67.2H96c-19.2 0-35.2 16-35.2 35.2s16 32 35.2 32h3.2c83.2 0 147.2-32 211.2-86.4l121.6-124.8c6.4-6.4 9.6-12.8 9.6-22.4 0-9.6-3.2-16-9.6-22.4-9.6-6.4-19.2-9.6-28.8-9.6z" p-id="2662"></path></svg>
             <svg v-show="isIntelligenceMode" @click="changePlayMode()" class="icon intelligence-mode-icon" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-label="心动模式">
-                <path class="heart-shape" d="M16 27.2S4.7 20.5 4.7 11.9C4.7 7.7 7.4 5 11.1 5c2.2 0 4 1.1 4.9 2.8C16.9 6.1 18.7 5 20.9 5c3.7 0 6.4 2.7 6.4 6.9C27.3 20.5 16 27.2 16 27.2Z" />
-                <path class="heart-trace" d="M8.4 16h4.2l1.7-3.6 3 7.2 2-3.6h4.3" />
+                <path class="intelligence-heart" fill="none" d="M16 26.4S6.3 20.7 6.3 13.1c0-3.8 2.4-6.2 5.6-6.2 1.9 0 3.3 0.9 4.1 2.5 0.8-1.6 2.2-2.5 4.1-2.5 3.2 0 5.6 2.4 5.6 6.2 0 7.6-9.7 13.3-9.7 13.3Z" />
+                <path class="intelligence-trace" fill="none" d="M3.5 17h6l2-4.2 3.5 8.1 3.1-6.2 2.1 4.1h6.3" />
+                <path class="intelligence-spark" fill="none" d="M25.8 3.6v3.5M24 5.4h3.6" />
             </svg>
             <!-- 播放列表按钮：只在非FM模式下显示 -->
             <svg t="1668787624519" @click="playlistWidgetShow = !playlistWidgetShow" v-show="!isInFMMode" class="playlist-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="15157" width="200" height="200"><path d="M85.333333 768h426.666667v85.333333H85.333333v-85.333333z m0-298.666667h597.333334v85.333334H85.333333v-85.333334z m0-298.666666h853.333334v85.333333H85.333333V170.666667z m725.333334 476.586666V384h213.333333v85.333333h-128v298.666667a128 128 0 1 1-85.333333-120.746667zM768 810.666667a42.666667 42.666667 0 1 0 0-85.333334 42.666667 42.666667 0 0 0 0 85.333334z" p-id="15158"></path></svg>
@@ -480,17 +481,13 @@
                 display: none !important;
             }
             .intelligence-mode-icon{
-                color: #e5404f;
-                .heart-shape{
-                    fill: currentColor;
-                }
-                .heart-trace{
-                    fill: none;
-                    stroke: white;
-                    stroke-width: 1.6;
-                    stroke-linecap: round;
-                    stroke-linejoin: round;
-                }
+                fill: none;
+                stroke: currentColor;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                .intelligence-heart{ stroke-width: 1.7; }
+                .intelligence-trace{ stroke-width: 2; }
+                .intelligence-spark{ stroke-width: 1.6; }
             }
         }
     }
