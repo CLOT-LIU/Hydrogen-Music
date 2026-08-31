@@ -86,6 +86,8 @@ let pendingShuffledCycleSignature = ''
 let onlinePlaybackSnapshot = null
 let intelligenceModeLoading = false
 let intelligenceSourceSnapshot = null
+let intelligenceRecommendationCache = null
+const INTELLIGENCE_RECOMMENDATION_CACHE_MS = 2 * 60 * 1000
 const levelFieldMap = {
     standard: 'l',
     higher: 'm',
@@ -974,6 +976,9 @@ watch(
     ],
     () => {
         scheduleNextSongAssetPrefetch()
+        if ((playMode.value == 2 || playMode.value == 3) && isFavoritePlaylistPlaybackContext()) {
+            void prefetchIntelligenceMode()
+        }
     },
     { immediate: true }
 )
@@ -2044,13 +2049,13 @@ export function setId(id, index) {
     }
 }
 
-export function addToList(listType, songlist, listMeta = null) {
+export function addToList(listType, songlist, listMeta = null, options = {}) {
     // 移除之前的 fmReset 事件，以保留FM状态
     // if (listInfo.value && listInfo.value.type === 'personalfm' && listType !== 'personalfm') {
     //     ...
     // }
 
-    const normalizedSongList = normalizeQueueSongs(songlist)
+    const normalizedSongList = (options.normalized === true ? songlist : normalizeQueueSongs(songlist))
         .filter(song => !userStore.localOnlyMode || song.type === 'local')
     let listId = 'none'
     if (listType === 'rec') {
@@ -2085,7 +2090,7 @@ export function addToList(listType, songlist, listMeta = null) {
     songList.value = normalizedSongList.slice(0, normalizedSongList.length + 1)
     clearPendingShuffledCycle()
     syncWindowsTaskbarPlaybackState()
-    savePlaylist()
+    if (options.persist !== false) savePlaylist()
 }
 
 export function localMusicHandle(list, isToNext) {
@@ -2726,7 +2731,7 @@ async function playIntelligenceList(list, listMeta = null, options = {}) {
 
     // 心动模式的顺序由服务端编排，不能再套用普通随机播放。
     applyPlayMode(0, { inFM: false })
-    addToList('intelligence', normalizedList, listMeta)
+    addToList('intelligence', normalizedList, listMeta, { normalized: true, persist: false })
 
     const preservedIndex = options.preserveCurrent === true
         ? normalizedList.findIndex(song => String(song?.id ?? '') === String(songId.value ?? ''))
@@ -2738,13 +2743,45 @@ async function playIntelligenceList(list, listMeta = null, options = {}) {
         return true
     }
 
-    await addSong(normalizedList[0].id, 0, true)
+    addSong(normalizedList[0].id, 0, true)
+    savePlaylist()
     return true
 }
 
 async function resolveFavoritePlaylistSongs(playlistId) {
     const normalizedPlaylistId = String(playlistId || '')
     if (!normalizedPlaylistId) return []
+
+    const snapshotSongs = intelligenceSourceSnapshot
+        && String(intelligenceSourceSnapshot.playlistId || '') === normalizedPlaylistId
+        && Array.isArray(intelligenceSourceSnapshot.songs)
+        ? intelligenceSourceSnapshot.songs
+        : null
+    const sourceSongs = snapshotSongs || libraryStore.detailCache?.[`playlist:${normalizedPlaylistId}`]?.librarySongs
+
+    if (Array.isArray(sourceSongs) && sourceSongs.length > 0) {
+        const normalizedSourceSongs = snapshotSongs || normalizeQueueSongs(sourceSongs)
+        if (!Array.isArray(userStore.likelist)) return normalizedSourceSongs
+
+        const likedSongIds = userStore.likelist.map(id => String(id))
+        const likedSongIdSet = new Set(likedSongIds)
+        const sourceSongIdSet = new Set(normalizedSourceSongs.map(song => String(song.id)))
+        const songById = new Map()
+
+        for (const song of [
+            ...normalizedSourceSongs,
+            ...(Array.isArray(songList.value) ? songList.value : []),
+        ]) {
+            songById.set(String(song.id), song)
+        }
+
+        const addedSongs = likedSongIds
+            .filter(id => !sourceSongIdSet.has(id) && songById.has(id))
+            .map(id => songById.get(id))
+        const retainedSongs = normalizedSourceSongs.filter(song => likedSongIdSet.has(String(song.id)))
+        const reconciledSongs = [...addedSongs, ...retainedSongs]
+        if (reconciledSongs.length === likedSongIdSet.size) return reconciledSongs
+    }
 
     const result = await getPlaylistAll({ id: normalizedPlaylistId })
     return normalizeQueueSongs(result?.songs || [])
@@ -2761,7 +2798,7 @@ async function restoreFavoritePlaylistAfterIntelligence(targetMode = 0) {
         const returnSongId = intelligenceSourceSnapshot?.returnSongId
         const returnSongIndex = favoriteSongs.findIndex(song => String(song?.id ?? '') === String(returnSongId ?? ''))
 
-        addToList('playlist', favoriteSongs, { id: playlistId })
+        addToList('playlist', favoriteSongs, { id: playlistId }, { normalized: true, persist: false })
 
         if (currentFavoriteIndex >= 0) {
             setId(playingSongId, currentFavoriteIndex)
@@ -2808,6 +2845,79 @@ function normalizeIntelligenceSongs(result) {
     })
 }
 
+function resolveIntelligencePlaybackContext(options = {}) {
+    const playlistId = options.playlistId || userStore.favoritePlaylistId || listInfo.value?.id
+    const sourceSongs = Array.isArray(options.songs)
+        ? normalizeQueueSongs(options.songs)
+        : (Array.isArray(songList.value) ? songList.value.slice() : [])
+    const likedSongIds = new Set((Array.isArray(userStore.likelist) ? userStore.likelist : []).map(id => String(id)))
+    const currentSong = sourceSongs.find(song => (
+        String(song?.id ?? '') === String(songId.value ?? '')
+        && likedSongIds.has(String(song?.id ?? ''))
+    ))
+    const seedSong = currentSong || sourceSongs.find(song => likedSongIds.has(String(song?.id ?? '')))
+
+    if (!playlistId || !seedSong) return null
+    return { playlistId, sourceSongs, seedSong }
+}
+
+async function loadIntelligenceRecommendations(context) {
+    const cacheKey = `${context.playlistId}:${context.seedSong.id}`
+    const cached = intelligenceRecommendationCache
+    if (cached?.key === cacheKey) {
+        if (cached.promise) return cached.promise
+        if (cached.songs && Date.now() - cached.completedAt < INTELLIGENCE_RECOMMENDATION_CACHE_MS) {
+            return cached.songs
+        }
+    }
+
+    const cacheEntry = {
+        key: cacheKey,
+        promise: null,
+        songs: null,
+        completedAt: 0,
+    }
+    cacheEntry.promise = getIntelligenceList({
+        id: context.seedSong.id,
+        pid: context.playlistId,
+        sid: context.seedSong.id,
+        count: 1,
+    }).then(result => {
+        if (Number(result?.code) !== 200) {
+            throw new Error(result?.message || result?.msg || 'intelligence-list-failed')
+        }
+
+        const songs = normalizeIntelligenceSongs(result)
+            .filter(song => String(song.id) !== String(context.seedSong.id))
+        if (songs.length == 0) throw new Error('intelligence-list-empty')
+
+        if (intelligenceRecommendationCache === cacheEntry) {
+            cacheEntry.promise = null
+            cacheEntry.songs = songs
+            cacheEntry.completedAt = Date.now()
+        }
+        return songs
+    }).catch(error => {
+        if (intelligenceRecommendationCache === cacheEntry) intelligenceRecommendationCache = null
+        throw error
+    })
+    intelligenceRecommendationCache = cacheEntry
+    return cacheEntry.promise
+}
+
+export async function prefetchIntelligenceMode() {
+    if (!userStore.user?.userId || !isFavoritePlaylistPlaybackContext()) return false
+    const context = resolveIntelligencePlaybackContext()
+    if (!context) return false
+
+    try {
+        await loadIntelligenceRecommendations(context)
+        return true
+    } catch (_) {
+        return false
+    }
+}
+
 async function startIntelligencePlayback(options = {}) {
     if (intelligenceModeLoading) return false
     if (!userStore.user?.userId) {
@@ -2817,41 +2927,23 @@ async function startIntelligencePlayback(options = {}) {
 
     intelligenceModeLoading = true
     try {
-        const playlistId = options.playlistId || userStore.favoritePlaylistId || listInfo.value?.id
-        const sourceSongs = normalizeQueueSongs(options.songs || songList.value)
-        const likedSongIds = new Set((Array.isArray(userStore.likelist) ? userStore.likelist : []).map(id => String(id)))
-        const currentSong = sourceSongs.find(song => (
-            String(song?.id ?? '') === String(songId.value ?? '')
-            && likedSongIds.has(String(song?.id ?? ''))
-        ))
-        const seedSong = currentSong || sourceSongs.find(song => likedSongIds.has(String(song?.id ?? '')))
-
-        if (!playlistId || !seedSong) {
+        const context = resolveIntelligencePlaybackContext(options)
+        if (!context) {
             noticeOpen('我喜欢的音乐里还没有歌曲', 2)
             return false
         }
 
-        const result = await getIntelligenceList({
-            id: seedSong.id,
-            pid: playlistId,
-            sid: seedSong.id,
-            count: 1,
-        })
-        if (Number(result?.code) !== 200) {
-            throw new Error(result?.message || result?.msg || 'intelligence-list-failed')
-        }
-
-        const recommendedSongs = normalizeIntelligenceSongs(result)
-        const queue = [seedSong, ...recommendedSongs.filter(song => String(song.id) !== String(seedSong.id))]
-        if (queue.length < 2) throw new Error('intelligence-list-empty')
+        const recommendedSongs = await loadIntelligenceRecommendations(context)
+        const queue = [context.seedSong, ...recommendedSongs]
 
         const sourceSnapshot = {
-            playlistId,
-            returnSongId: seedSong.id,
+            playlistId: context.playlistId,
+            songs: context.sourceSongs,
+            returnSongId: context.seedSong.id,
         }
         const preserveCurrent = options.preserveCurrent === true
-            && String(songId.value ?? '') === String(seedSong.id)
-        const started = await playIntelligenceList(queue, { id: playlistId }, { preserveCurrent })
+            && String(songId.value ?? '') === String(context.seedSong.id)
+        const started = await playIntelligenceList(queue, { id: context.playlistId }, { preserveCurrent })
         if (!started) throw new Error('intelligence-play-failed')
         intelligenceSourceSnapshot = sourceSnapshot
         noticeOpen(`心动模式已开启 · ${queue.length} 首`, 2)

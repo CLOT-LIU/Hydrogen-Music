@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 import { songTime2 } from '../utils/time';
 import VueSlider from 'vue-slider-component';
 import OverflowMarquee from './base/OverflowMarquee.vue';
-import { startMusic, pauseMusic, playLast, playNext, changeProgress, changePlayMode, likeSong } from '../utils/player/lazy';
+import { startMusic, pauseMusic, playLast, playNext, changeProgress, changePlayMode, prefetchIntelligenceMode, likeSong } from '../utils/player/lazy';
 import { getDjDetail, subDj } from '../api/dj';
 import { useUserStore } from '../store/userStore';
 import { usePlayerStore } from '../store/playerStore';
@@ -750,6 +750,7 @@ const toggleDjSub = async isSubscribe => {
                 <svg
                     t="1670376314067"
                     @click="changePlayMode()"
+                    @pointerenter="prefetchIntelligenceMode()"
                     v-show="playMode == 0"
                     class="icon"
                     viewBox="0 0 1024 1024"
@@ -769,6 +770,7 @@ const toggleDjSub = async isSubscribe => {
                 <svg
                     t="1668787163705"
                     @click="changePlayMode()"
+                    @pointerenter="prefetchIntelligenceMode()"
                     v-show="playMode == 1"
                     class="icon"
                     viewBox="0 0 1024 1024"
@@ -787,6 +789,7 @@ const toggleDjSub = async isSubscribe => {
                 <svg
                     t="1668787191526"
                     @click="changePlayMode()"
+                    @pointerenter="prefetchIntelligenceMode()"
                     v-show="playMode == 2"
                     class="icon"
                     viewBox="0 0 1024 1024"
@@ -806,6 +809,7 @@ const toggleDjSub = async isSubscribe => {
                 <svg
                     t="1668787213634"
                     @click="changePlayMode()"
+                    @pointerenter="prefetchIntelligenceMode()"
                     v-show="playMode == 3"
                     class="icon"
                     viewBox="0 0 1024 1024"
