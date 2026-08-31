@@ -80,6 +80,7 @@
     ],
     "other": {
       "globalShortcuts": true,
+      "rememberWindowSize": false,
       "quitApp": "minimize",
       "customFont": "",
       "customFontLabel": ""

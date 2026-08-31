@@ -34,6 +34,7 @@ const rlyricSize = ref(12)
 const lyricInterlude = ref(13)
 const searchAssistLimit = ref(8)
 const globalShortcuts = ref(false)
+const rememberWindowSize = ref(false)
 const quitApp = ref('minimize')
 const quitAppOptions = ref([
     {
@@ -158,6 +159,7 @@ const applySettingsToForm = settings => {
     localFolder.value = normalizedSettings.local.localFolder
     shortcutsList.value = normalizedSettings.shortcuts
     globalShortcuts.value = normalizedSettings.other.globalShortcuts
+    rememberWindowSize.value = normalizedSettings.other.rememberWindowSize
     quitApp.value = normalizedSettings.other.quitApp
     customFont.value = normalizedSettings.other.customFont
     customFontLabel.value = normalizedSettings.other.customFontLabel
@@ -262,6 +264,7 @@ const setAppSettings = () => {
         shortcuts: shortcutsList.value,
         other: {
             globalShortcuts: globalShortcuts.value,
+            rememberWindowSize: rememberWindowSize.value,
             quitApp: quitApp.value,
             customFont: customFont.value,
             customFontLabel: customFont.value ? customFontLabel.value : '',
@@ -989,6 +992,17 @@ const toggleLocalOnlyMode = async () => {
                             <div class="option-name">清空漫游缓存</div>
                             <div class="option-operation">
                                 <div class="button" @click="clearFmRecent">清空</div>
+                            </div>
+                        </div>
+                        <div class="option">
+                            <div class="option-name">记住窗口大小</div>
+                            <div class="option-operation">
+                                <div class="toggle" @click="rememberWindowSize = !rememberWindowSize">
+                                    <div class="toggle-off" :class="{ 'toggle-on-in': rememberWindowSize }">{{ rememberWindowSize ? '已开启' : '已关闭' }}</div>
+                                    <Transition name="toggle">
+                                        <div class="toggle-on" v-show="rememberWindowSize"></div>
+                                    </Transition>
+                                </div>
                             </div>
                         </div>
                         <div class="option">

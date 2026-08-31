@@ -75,6 +75,7 @@ export function normalizeMusicSettings(music = {}) {
 
 function normalizeOtherSettings(other = {}) {
     const normalized = { ...other }
+    normalized.rememberWindowSize = normalized.rememberWindowSize === true
     normalized.customFont = normalizeCustomText(normalized.customFont, DEFAULT_SETTINGS.other.customFont)
     normalized.customFontLabel = normalizeCustomText(normalized.customFontLabel, DEFAULT_SETTINGS.other.customFontLabel)
     if (!normalized.customFont) normalized.customFontLabel = DEFAULT_SETTINGS.other.customFontLabel

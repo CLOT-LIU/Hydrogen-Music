@@ -49,6 +49,17 @@ function getQuitAppPreference() {
     }
 }
 
+function getRememberWindowSizePreference() {
+    try {
+        const Store = require('electron-store').default
+        const settingsStore = new Store({ name: 'settings' })
+        const settings = settingsStore.get('settings')
+        return settings?.other?.rememberWindowSize === true
+    } catch (_) {
+        return false
+    }
+}
+
 function resolveNcmApiReady(payload) {
     if (ncmApiReadyResolved) return;
     ncmApiReadyResolved = true;
@@ -227,14 +238,19 @@ const createWindow = () => {
 
     process.env.DIST = path.join(__dirname, './')
     const indexHtml = path.join(process.env.DIST, 'dist/index.html')
-    const Winstate = require('electron-win-state').default
-    const winstate = new Winstate({
-        //自定义默认窗口大小
-        defaultWidth: MAIN_WINDOW_MIN_WIDTH,
-        defaultHeight: MAIN_WINDOW_MIN_HEIGHT,
-    })
+    const Store = require('electron-store').default
+    const windowStateStore = new Store({ name: 'window-state' })
+    const rememberWindowSize = getRememberWindowSizePreference()
+    const storedWindowState = rememberWindowSize ? windowStateStore.store : {}
+    const storedWindowWidth = Number(storedWindowState.width)
+    const storedWindowHeight = Number(storedWindowState.height)
+    const windowWidth = Number.isFinite(storedWindowWidth) ? Math.max(MAIN_WINDOW_MIN_WIDTH, storedWindowWidth) : MAIN_WINDOW_MIN_WIDTH
+    const windowHeight = Number.isFinite(storedWindowHeight) ? Math.max(MAIN_WINDOW_MIN_HEIGHT, storedWindowHeight) : MAIN_WINDOW_MIN_HEIGHT
+    if (!rememberWindowSize) windowStateStore.clear()
     const isMac = process.platform === 'darwin'
     const win = new BrowserWindow({
+        width: windowWidth,
+        height: windowHeight,
         minWidth: MAIN_WINDOW_MIN_WIDTH,
         minHeight: MAIN_WINDOW_MIN_HEIGHT,
         // macOS 使用原生交通灯；其他平台仍用自定义无边框
@@ -244,8 +260,6 @@ const createWindow = () => {
         title: "Hydrogen Music",
         icon: path.resolve(__dirname, './src/assets/icon/' + (process.platform === 'win32' ? 'icon.ico' : 'icon.png')),
         backgroundColor: '#fff',
-        //记录窗口大小
-        ...winstate.winOptions,
         show: false,
         webPreferences: {
             //预加载脚本
@@ -416,8 +430,14 @@ const createWindow = () => {
             initPostShowFeatures()
         }
     }, 2500)
-    winstate.manage(win)
     win.on('close', (event) => {
+        if (getRememberWindowSizePreference()) {
+            const { width, height } = win.getNormalBounds()
+            windowStateStore.store = { width, height }
+        } else {
+            windowStateStore.clear()
+        }
+
         if (forceQuit) {
             // 如果是强制退出 (Cmd+Q)，则不阻止默认行为
             myWindow = null;
