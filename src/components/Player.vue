@@ -141,6 +141,7 @@ const safeVolume = computed({
 
 // 检查是否在FM模式
 const isInFMMode = computed(() => listInfo.value?.type === 'personalfm');
+const isIntelligenceMode = computed(() => listInfo.value?.type === 'intelligence');
 
 // 是否为电台(DJ)模式
 const isDjMode = computed(() => listInfo.value?.type === 'dj');
@@ -455,7 +456,7 @@ const toggleDjSub = async isSubscribe => {
                 </div>
             </div>
 
-            <div class="song-control">
+            <div class="song-control" :class="{ 'is-intelligence-mode': isIntelligenceMode }">
                 <svg
                     t="1673355036226"
                     v-if="musicVideo"
@@ -818,6 +819,18 @@ const toggleDjSub = async isSubscribe => {
                         d="M844.8 665.6c-6.4-6.4-16-12.8-25.6-9.6-19.2 0-35.2 16-35.2 35.2 0 9.6 6.4 19.2 12.8 25.6l41.6 41.6c-44.8-6.4-86.4-22.4-121.6-51.2-3.2 0-3.2-3.2-6.4-6.4L332.8 304C268.8 233.6 192 195.2 99.2 195.2c-19.2 0-35.2 16-35.2 35.2s16 32 35.2 32c73.6 0 134.4 32 182.4 86.4l384 400 6.4 6.4c48 38.4 108.8 64 172.8 70.4l-48 44.8c-9.6 6.4-16 19.2-16 28.8 0 19.2 19.2 35.2 38.4 32 9.6 0 19.2-6.4 25.6-12.8l99.2-92.8c16-16 16-41.6 0-57.6l-99.2-102.4z m-3.2-556.8c-12.8-16-32-19.2-48-6.4-9.6 6.4-12.8 16-12.8 25.6 0 12.8 3.2 22.4 16 28.8l41.6 41.6c-73.6 9.6-140.8 38.4-192 89.6l-115.2 118.4c-12.8 12.8-12.8 32 0 44.8 6.4 6.4 16 9.6 25.6 9.6s19.2-3.2 25.6-9.6l112-118.4c41.6-38.4 92.8-64 147.2-70.4l-44.8 44.8c-6.4 6.4-12.8 16-12.8 25.6 0 19.2 16 35.2 32 35.2 9.6 0 19.2-3.2 28.8-9.6L950.4 256c12.8-12.8 12.8-35.2 0-48l-108.8-99.2m-438.4 448c-9.6 0-19.2 3.2-25.6 9.6l-118.4 121.6c-48 44.8-96 67.2-160 67.2H96c-19.2 0-35.2 16-35.2 35.2s16 32 35.2 32h3.2c83.2 0 147.2-32 211.2-86.4l121.6-124.8c6.4-6.4 9.6-12.8 9.6-22.4 0-9.6-3.2-16-9.6-22.4-9.6-6.4-19.2-9.6-28.8-9.6z"
                         p-id="2662"
                     ></path>
+                </svg>
+
+                <svg
+                    v-show="isIntelligenceMode"
+                    @click="changePlayMode()"
+                    class="icon intelligence-mode-icon"
+                    viewBox="0 0 32 32"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-label="心动模式"
+                >
+                    <path class="heart-shape" d="M16 27.2S4.7 20.5 4.7 11.9C4.7 7.7 7.4 5 11.1 5c2.2 0 4 1.1 4.9 2.8C16.9 6.1 18.7 5 20.9 5c3.7 0 6.4 2.7 6.4 6.9C27.3 20.5 16 27.2 16 27.2Z" />
+                    <path class="heart-trace" d="M8.4 16h4.2l1.7-3.6 3 7.2 2-3.6h4.3" />
                 </svg>
 
                 <!-- 歌词/评论切换按钮：本地歌曲隐藏评论按钮 -->
@@ -1232,6 +1245,22 @@ const toggleDjSub = async isSubscribe => {
                 width: 2.5vh;
                 height: 2.5vh;
                 display: block;
+            }
+            &.is-intelligence-mode svg[t="1670376314067"] {
+                display: none !important;
+            }
+            .intelligence-mode-icon {
+                color: #e5404f;
+                .heart-shape {
+                    fill: currentColor;
+                }
+                .heart-trace {
+                    fill: none;
+                    stroke: white;
+                    stroke-width: 1.6;
+                    stroke-linecap: round;
+                    stroke-linejoin: round;
+                }
             }
         }
     }
